@@ -20,25 +20,11 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         //单例模式
         spatialDatabaseHelper=SpatialDatabaseHelper.getInstance();
-        db=new Database();
-        try {
-            File dbFile=new File(Environment.getExternalStorageDirectory().getPath()+"/test.sqlite");
-            db.open(dbFile.toString(), jsqlite.Constants.SQLITE_OPEN_READONLY);
-            String query = "SELECT name, peoples, AsText(Geometry) from Towns where peoples > 350000";
-            Stmt stmt = db.prepare(query);
-            stmt.step();
-            while (stmt.step()) {
-                String tableName = stmt.column_string(0);
-                String type = stmt.column_string(1);
-                String srid = stmt.column_string(2);
-                Log.e(TAG, tableName+type+srid);
-            }
-            stmt.close();
-            db.close();
-        } catch (Exception e){
-            Log.e(TAG, String.valueOf(e));
-            e.printStackTrace();
-        }
+    }
 
+    @Override
+    protected void onDestroy() {
+        spatialDatabaseHelper.close();
+        super.onDestroy();
     }
 }
