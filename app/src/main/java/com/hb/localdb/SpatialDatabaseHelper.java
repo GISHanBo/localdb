@@ -1,12 +1,16 @@
 package com.hb.localdb;
 
-import android.os.Environment;
+import android.content.Context;
 import android.util.Log;
 
 import com.hb.entity.Heat;
 import com.hb.entity.Marker;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 import jsqlite.Constants;
 import jsqlite.Database;
@@ -15,7 +19,7 @@ import jsqlite.Stmt;
 
 public class SpatialDatabaseHelper {
     private static String TAG = "空间数据库";
-    private static String path = Environment.getExternalStorageDirectory().getPath() + "/test.sqlite";
+    private static String path ;
     private Database database;
 
 
@@ -24,54 +28,24 @@ public class SpatialDatabaseHelper {
     }
 
     private SpatialDatabaseHelper() {
+//        String dirPath=context.getFilesDir().getPath()+"/"+ context.getPackageName()+ "/databases";
+        Log.e(TAG,3+path);
         database = OpenDatabase(path);
-        //检测数据表是否存在,存在则清空数据
+
         Log.e(TAG, "创建数据库");
-        if (!isTableExit(database, "marker")) {
-            createTableMarker(database);
-            Log.e(TAG, "创建表");
-        }else {
-            clearTable(database,"marker");
-            Log.e(TAG, "清除表");
-        }
-        if (!isTableExit(database, "heat")) {
-            createTableHeat(database);
-            Log.e(TAG, "创建表");
-        }else {
-            clearTable(database,"heat");
-            Log.e(TAG, "清除表");
-        }
+        close();
+
     }
 
-    /**
-     * 添加一个点名为marker的表,并添加geom字段
-     *
-     * @param database 数据库
-     */
-    private void createTableMarker(Database database) {
-        doSQL(database, "create table marker(id integer primary key, icon text,serial integer);");
-        //添加geometry字段
-        doSQL(database, "select AddGeometryColumn('marker', 'geom', 4326, 'POINT', 'XY');");
-    }
 
     /**
      * 向marker表中插入数据
-     * @param database 空间上数据库
      * @param marker 图标和坐标信息
      */
-    public void addMarker(Database database,Marker marker){
+    public void addMarker(Marker marker){
         doSQL(database,"insert into marker (serial, icon, geom)values('"+marker.getSerial()+"', '"+marker.getIcon()+"', MakePoint("+marker.getLat()+" ,"+marker.getLng()+", 4326))");
     }
-    /**
-     * 添加一个点名为heat的表,并添加geom字段
-     *
-     * @param database 空间数据库
-     */
-    private void createTableHeat(Database database) {
-        doSQL(database, "create table heat(id integer primary key, value float);");
-        //添加geometry字段
-        doSQL(database, "select AddGeometryColumn('heat', 'geom', 4326, 'POINT', 'XY');");
-    }
+
     /**
      * 向heat表中插入热力数据
      * @param database 空间上数据库
@@ -81,7 +55,12 @@ public class SpatialDatabaseHelper {
         doSQL(database,"insert into heat (value, geom)values('"+heat.getValue()+"', MakePoint("+heat.getLat()+" ,"+heat.getLng()+", 4326))");
     }
 
-    public static final SpatialDatabaseHelper getInstance() {
+    public  static final SpatialDatabaseHelper getInstance(Context context) {
+
+        if(path==null){
+            path=createDB(context);
+        }
+        Log.e(TAG,2+path);
         return ClassHolder.INSTANCE;
     }
 
@@ -100,7 +79,9 @@ public class SpatialDatabaseHelper {
             return database;
         } catch (Exception e) {
             e.printStackTrace();
+
         }
+        Log.e(TAG,"打开数据库失败");
         return null;
     }
 
@@ -162,6 +143,41 @@ public class SpatialDatabaseHelper {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * 每次自动从Assets复制空间数据库
+     * @param context
+     * @return 生成的数据库路径
+     */
+    public static String createDB(Context context){
+        String filePath = context.getFilesDir().getPath()+"/"+ context.getPackageName()+ "/databases/";
+//        String filePath=Environment.getExternalStorageDirectory()+"/tempDB/";
+        String dbName="db.sqlite";
+        File dir = new File(filePath);
+        // 如果目录不中存在，创建这个目录
+        if (!dir.exists())dir.mkdirs();
+        try {
+            File target=new File(filePath+dbName);
+            if(target.exists()){
+                target.delete();
+            }
+            InputStream is = context.getResources().getAssets()
+                    .open(dbName);
+            FileOutputStream fos = new FileOutputStream(filePath+dbName);
+            byte[] buffer = new byte[7168];
+            int count;
+            while ((count = is.read(buffer)) > 0) {
+                fos.write(buffer, 0, count);
+            }
+            fos.close();
+            is.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return filePath+dbName;
     }
 
 }
